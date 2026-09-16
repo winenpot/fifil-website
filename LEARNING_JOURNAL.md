@@ -49,7 +49,7 @@ The browser needs pages and assets to **view** the site. Submitting a form needs
 
 Complete one stage at a time. Record the actual result below before moving to the next stage.
 
-1. [ ] **Inventory the host (in progress).** Ubuntu 26.04.1, Docker 29.1.3, and Compose 2.40.3 are present. Docker publishes ports 80/443. We still need the container names and restart policies. No changes yet.
+1. [x] **Inventory the host.** Ubuntu 26.04.1, Docker 29.1.3, and Compose 2.40.3 are present. Docker publishes ports 80/443 through the `competition-ghore-caddy-1` Caddy container. Docker is enabled. Every listed running container has `unless-stopped` or `always`, so it should return after a reboot unless it had been manually stopped. Plan a maintenance window; do not assume zero downtime.
 2. [ ] **Prepare the app.** Build and run `Dockerfile.app` on a non-public test port; confirm homepage and forms.
 3. [ ] **Persist SQLite.** Mount a local Docker volume at `/app/data`; submit a test record; recreate the container; confirm the record survives.
 4. [ ] **Set the admin secret.** Provide a long random `FILFIL_ADMIN_TOKEN` without committing it to Git or putting it in this journal. Confirm the protected API rejects an unauthenticated request.
@@ -71,7 +71,7 @@ sudo ss -ltnp '( sport = :80 or sport = :443 )'
 
 These are read-only. An error is useful evidence too: for example, “permission denied” for Docker differs from “Docker is not installed.” Record the results below, omitting secrets.
 
-The first run showed Ubuntu 26.04.1 LTS, Docker Engine 29.1.3, and Docker Compose 2.40.3. Ports 80 and 443 are held by `docker-proxy` on IPv4 and IPv6. This means a container is publishing those ports; it does **not** tell us which container or whether it will restart after a host reboot. The login banner also says a reboot is required. We have not rebooted.
+The first run showed Ubuntu 26.04.1 LTS, Docker Engine 29.1.3, and Docker Compose 2.40.3. Ports 80 and 443 are held by `docker-proxy` on IPv4 and IPv6. The follow-up identified `competition-ghore-caddy-1` as the container publishing them. The login banner also says a reboot is required. We have not rebooted.
 
 Read-only follow-up before planning any reboot:
 
@@ -83,7 +83,7 @@ docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 docker ps -q | xargs -r docker inspect --format '{{.Name}} restart={{.HostConfig.RestartPolicy.Name}}'
 ```
 
-Ubuntu's reboot marker says an installed package wants a reboot to finish applying; zero pending package updates does not erase that requirement. A host reboot stops all containers for the duration. Whether each one returns automatically depends on Docker starting and its restart policy (`always` or `unless-stopped` normally restart; `no` does not). Check the actual policies before choosing a maintenance window. [Ubuntu update guidance](https://ubuntu.com/blog/ubuntu-updates-best-practices-for-updating-your-instance), [Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/).
+Ubuntu's reboot marker says an installed package wants a reboot to finish applying; zero pending package updates does not erase that requirement. Here it lists `linux-image-7.0.0-30-generic` and `linux-image-7.0.0-31-generic`, while `uname -r` reports the older running kernel `7.0.0-15-generic`. A reboot is therefore required to start the new kernel. `libc6` also commonly requires process restarts. A host reboot stops all containers for the duration. Docker is enabled, and all listed containers have `unless-stopped` or `always`; they should return when Docker starts after the host boots, unless an `unless-stopped` container was manually stopped before the reboot. Check the actual policies before choosing a maintenance window. [Ubuntu update guidance](https://ubuntu.com/blog/ubuntu-updates-best-practices-for-updating-your-instance), [Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/).
 
 ## Step log
 
@@ -93,6 +93,58 @@ Ubuntu's reboot marker says an installed package wants a reboot to finish applyi
 - **Observed:** Ubuntu 26.04.1 LTS; Docker 29.1.3; Compose 2.40.3; `docker-proxy` listening on 80/443 for IPv4 and IPv6. Login banner says restart required; no package updates currently pending.
 - **What I revised:** “Restart required” means a package requested a reboot, not that we should reboot immediately. Docker being installed does not prove its containers will recover automatically.
 - **Next:** Identify the affected packages, running containers, and their restart policies. Do not reboot during this learning step.
+
+### 2026-09-16 — Host inventory, reboot assessment
+
+- **Observed:** The reboot marker names newer Linux kernels 7.0.0-30 and 7.0.0-31 plus `libc6`; the running kernel is 7.0.0-15. Docker starts at boot. All 24 listed running containers use `unless-stopped`, except `bi-site-1`, which uses `always`. Caddy container `competition-ghore-caddy-1` owns the public 80/443 ports.
+- **What I learned:** A reboot is an operating-system interruption. Docker restart policies preserve availability after boot; they do not keep containers running through the reboot. `unless-stopped` means restart after Docker restarts unless someone deliberately stopped that container; `always` starts again even after an earlier manual stop when Docker starts.
+- **Next:** Pick a maintenance window only after checking the services' data persistence and the Caddy configuration. The Filfil deployment should join the existing Caddy routing rather than bind 80/443 itself.
+
+### Step 2: pending Caddy inspection
+
+The public request path is `visitor → host port 80/443 → Docker port mapping → Caddy container → app container`. Caddy is inside Docker, but remains the public entry point because its container publishes the host's 80/443 ports. We need to inspect its configuration, attached Docker networks, and mounts before adding a new route.
+
+Run only these read-only commands on the server. They deliberately do not print the container's environment variables, since those can contain secrets:
+
+```sh
+docker inspect competition-ghore-caddy-1 --format 'project_dir={{index .Config.Labels "com.docker.compose.project.working_dir"}} project={{index .Config.Labels "com.docker.compose.project"}}'
+docker inspect competition-ghore-caddy-1 --format '{{range .Mounts}}{{println .Type .Source "->" .Destination}}{{end}}'
+docker inspect competition-ghore-caddy-1 --format '{{range $name, $network := .NetworkSettings.Networks}}{{println $name}}{{end}}'
+docker exec competition-ghore-caddy-1 caddy version
+docker exec competition-ghore-caddy-1 sh -c 'find /etc/caddy -maxdepth 2 -type f -print'
+```
+
+Then open the Caddyfile using the path shown by `find` and run `sed -n '1,260p' PATH_TO_CADDYFILE`. Before pasting it here, redact any passwords, API keys, DNS-provider tokens, or private upstream addresses if present. Normally a Caddyfile contains only public domains and reverse-proxy targets.
+
+### 2026-09-16 — Caddy inspection, first pass
+
+- **Observed:** The Compose project is `competition-ghore`; its project directory is `/home/competition-ghore`. Caddy is version `v2.11.4`. Its Caddyfile is a bind mount from the host path `/home/competition-ghore/Caddyfile` to the container path `/etc/caddy/Caddyfile`. It uses named Docker volumes for `/data` and `/config`, and is attached to the named network `competition-ghore_default`.
+- **What this means:** `docker inspect --format` looks complicated because Docker normally stores each container's full configuration as a large JSON document. The command extracts two labels from that document: the Compose project name and the directory that launched it. It did not change anything.
+
+  A **bind mount** links one specific host path directly into a container. Therefore `/home/competition-ghore/Caddyfile` is the real configuration file on the server; Caddy sees that same file at `/etc/caddy/Caddyfile` inside its container. A **named volume** is Docker-managed persistent storage. Caddy's `/data` volume generally holds certificates and related state; `/config` holds Caddy runtime configuration. Do not remove either volume.
+
+  `competition-ghore_default` is a normal, human-readable Docker network name created by Compose. Think of it as a private virtual LAN. Containers on it can reach each other by service/container name using Docker's internal DNS. The network has IP addresses internally, but using an app name is intentional: addresses can change when containers are recreated. The future Filfil app should join this network; Caddy can then proxy to a name such as `filfil-app:8080` without publishing Filfil's port to the internet.
+
+  `v2.11.4` is the Caddy software version. The long `h1:...` string is a build checksum/identifier, useful for verifying exactly which build is installed. We only needed the version to know which configuration syntax and behavior we are working with. It is not a password or a secret.
+
+  `docker exec ... /etc/caddy/Caddyfile` runs the command **inside the Caddy container**. Its result is the same host file in this case because the host Caddyfile is bind-mounted there.
+
+- **Safe sharing habit:** Before sharing any configuration file, look for values that let someone authenticate as you or change external systems: passwords, `token=`, `api_key=`, `secret=`, private keys, or DNS-provider credentials. Replace the value with `[REDACTED]`, preserving the setting name and surrounding structure. Domains, service names, ports, and ordinary `reverse_proxy` lines are normally fine to share. Keep secrets out of Git, screenshots, the journal, and chat history.
+- **Next:** Read the Caddyfile locally and identify its existing site blocks and proxy pattern. Paste a redacted copy only if it contains sensitive values.
+
+#### Bind mount
+It means Docker takes an existing file or folder from the host machine and makes it appear inside the container at another path.
+In your case:
+```
+Server file:    /home/competition-ghore/Caddyfile
+Container path: /etc/caddy/Caddyfile
+```
+Caddy runs inside Docker and reads /etc/caddy/Caddyfile, but Docker is feeding it the actual server file from /home/competition-ghore/Caddyfile.
+So editing the host file changes what Caddy sees. The container does not own a separate copy.
+Compare it with a named volume:
+- Bind mount: you choose the exact host path. Good for config files you want to edit directly.
+- Named volume: Docker chooses and manages the storage location. Good for app data and Caddy’s certificates.
+
 
 ### Template for the next entry
 
