@@ -1,0 +1,24 @@
+{
+  "lists": [
+    {
+      "name": "recipes",
+      "initial": 12,
+      "total": 86,
+      "captured": 74
+    },
+    {
+      "name": "mag",
+      "initial": 6,
+      "total": 37,
+      "captured": 31
+    },
+    {
+      "name": "products",
+      "initial": 12,
+      "total": 19,
+      "captured": 7
+    }
+  ],
+  "missingPages": [],
+  "missingAssets": []
+}

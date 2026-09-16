@@ -1,0 +1,103 @@
+.relative {
+    position: relative
+}
+
+#loading {
+    display: none;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    width: 100%;
+    height: 100%;
+}
+
+    #loading::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.19);
+    }
+
+    #loading > figure {
+        height: 100%;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 100;
+        transform: translateX(-50%);
+    }
+
+        #loading > figure > img {
+            height: auto;
+            object-fit: cover;
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        #loading > figure > figcaption {
+            text-align: center;
+            margin: 10px auto;
+            padding: 10px 0;
+            color: #000;
+        }
+
+/* faqs */
+.other_page .c-faq-list {
+    width: 100%;
+    padding-top: 30px;
+}
+
+.other_page .c-faq-list .js-faq-item {
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid #d3d3d3;
+    transition: all 0.3s ease-out;
+    cursor: pointer;
+    margin-bottom: 20px;
+}
+
+.other_page .c-faq-list .js-faq-item .c-question {
+    font-size: 14px;
+    color: #666;
+}
+
+.other_page .c-faq-list .js-faq-item .c-question::before {
+    font-size: 17px;
+    transition: all 0.3s ease-out;
+}
+
+.other_page .c-faq-list .js-faq-item .c-answer {
+    font-size: 14px;
+    color: #333;
+    display: none;
+    border-top: 1px solid #eee;
+    margin-top: 10px;
+    padding-top: 10px;
+}
+
+.other_page .c-faq-list .js-faq-item.active, .other_page .c-faq-list .js-faq-item:hover {
+    border-color: var(--main-color);
+    box-shadow: 0 1px 10px rgba(0, 0, 0, 0.2);
+}
+
+.other_page .c-faq-list .js-faq-item.active .c-question, .other_page .c-faq-list .js-faq-item:hover .c-question {
+    color: #333;
+}
+
+.other_page .c-faq-list .js-faq-item.active .c-question::before, .other_page .c-faq-list .js-faq-item:hover .c-question::before {
+    color: #f90;
+}
+
+.other_page .c-faq-list .js-faq-item.active .c-answer, .other_page .c-faq-list .js-faq-item:hover .c-answer {
+    color: #222;
+}
+
+.other_page .c-faq-list .js-faq-item.active .c-answer {
+    display: block;
+}

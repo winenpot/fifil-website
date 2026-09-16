@@ -1,0 +1,27 @@
+{
+  "name": "fifil-website",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "mirror": "node scrape-filfil.js",
+    "mirror:lists": "node complete-lists.js",
+    "start": "node server.js",
+    "check": "node --check scrape-filfil.js && node --check complete-lists.js && node --check server.js && node --check server-client.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.4.1",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.4.1",
+  "type": "module",
+  "dependencies": {
+    "puppeteer": "^25.11.0"
+  }
+}
