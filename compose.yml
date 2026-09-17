@@ -1,0 +1,30 @@
+name: filfil
+
+services:
+  filfil-app:
+    image: filfil:initial
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      FILFIL_DATA_DIR: /app/data
+      FILFIL_ADMIN_TOKEN: ${FILFIL_ADMIN_TOKEN:?Set FILFIL_ADMIN_TOKEN before starting}
+    volumes:
+      - data:/app/data
+    networks:
+      - caddy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "8080:8080"
+
+volumes:
+  data:
+
+networks:
+  caddy:
+    external: true
+    name: competition-ghore_default
